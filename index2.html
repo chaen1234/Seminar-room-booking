@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>세미나실 예약 시스템 (구글 연동)</title>
+  <style>
+    body { font-family: 'Noto Sans KR', sans-serif; max-width: 1000px; margin: 20px auto; padding: 0 15px; color: #333; }
+    h2, h3 { color: #1a365d; text-align: center; }
+    .booking-card { background: #f7fafc; border: 1px solid #e2e8f0; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 15px; }
+    .form-group { display: flex; flex-direction: column; }
+    .form-group label { font-size: 14px; font-weight: bold; margin-bottom: 5px; }
+    .form-group input, .form-group select { padding: 8px 12px; border: 1px solid #cbd5e0; border-radius: 4px; }
+    .btn-submit { width: 100%; background-color: #2b6cb0; color: white; border: none; padding: 12px; font-size: 16px; font-weight: bold; border-radius: 4px; cursor: pointer; }
+    .btn-submit:disabled { background-color: #a0aec0; cursor: not-allowed; }
+    .filter-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+    .timetable-wrapper { overflow-x: auto; border: 1px solid #cbd5e0; border-radius: 6px; }
+    .timetable { width: 100%; border-collapse: collapse; min-width: 700px; text-align: center; background: white; }
+    .timetable th, .timetable td { border: 1px solid #e2e8f0; padding: 8px; font-size: 13px; }
+    .timetable th { background-color: #ebf8ff; color: #2b6cb0; }
+    .timetable td.time-col { background-color: #f7fafc; font-weight: bold; width: 90px; }
+    .booked-cell { background-color: #ebf8ff; border-left: 3px solid #3182ce !important; color: #2c5282; font-size: 12px; }
+    .loading-overlay { text-align: center; color: #4a5568; font-weight: bold; margin: 10px 0; }
+  </style>
+</head>
+<body>
+
+  <h2>🏫 세미나실 예약 시스템</h2>
+
+  <div class="booking-card">
+    <form id="bookingForm">
+      <div class="form-grid">
+        <div class="form-group">
+          <label>이름</label>
+          <input type="text" id="userName" required placeholder="홍길동">
+        </div>
+        <div class="form-group">
+          <label>학번</label>
+          <input type="text" id="studentId" required placeholder="20261234">
+        </div>
+        <div class="form-group">
+          <label>세미나실 선택</label>
+          <select id="roomSelect" required>
+            <option value="">선택하세요</option>
+            <script>
+              for(let i=1; i<=10; i++) document.write(`<option value="${i}">세미나실 ${i}</option>`);
+            </script>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>예약 날짜 (월~금)</label>
+          <input type="date" id="bookingDate" required>
+        </div>
+        <div class="form-group">
+          <label>시작 시간 (08:00 ~ 21:00)</label>
+          <select id="startTime" required></select>
+        </div>
+        <div class="form-group">
+          <label>종료 시간 (09:00 ~ 22:00)</label>
+          <select id="endTime" required></select>
+        </div>
+      </div>
+      <button type="submit" class="btn-submit" id="submitBtn">예약 신청하기</button>
+    </form>
+  </div>
+
+  <div class="filter-container">
+    <h3>📅 주간 실시간 예약 시간표</h3>
+    <div>
+      <label for="viewRoomSelect" style="font-weight: bold;">조회할 세미나실: </label>
+      <select id="viewRoomSelect" style="padding: 5px 10px;">
+        <script>
+          for(let i=1; i<=10; i++) document.write(`<option value="${i}">세미나실 ${i}</option>`);
+        </script>
+      </select>
+    </div>
+  </div>
+
+  <div id="loadingStatus" class="loading-overlay" style="display:none;">⏳ 구글 시트에서 실시간 예약 정보를 불러오는 중...</div>
+
+  <div class="timetable-wrapper">
+    <table class="timetable">
+      <thead>
+        <tr>
+          <th>시간</th>
+          <th>월요일</th>
+          <th>화요일</th>
+          <th>수요일</th>
+          <th>목요일</th>
+          <th>금요일</th>
+        </tr>
+      </thead>
+      <tbody id="timetableBody"></tbody>
+    </table>
+  </div>
+
+  <script>
+    // ⚠️ 2단계에서 생성한 Google Apps Script 웹 앱 URL을 아래에 넣으세요!
+    const SCRIPT_URL = "여기에_구글_웹앱_URL_복사_붙여넣기";
+
+    let bookings = [];
+
+    // 시간 옵션 바인딩
+    const startTimeSelect = document.getElementById('startTime');
+    const endTimeSelect = document.getElementById('endTime');
+    for (let h = 8; h <= 21; h++) startTimeSelect.innerHTML += `<option value="${String(h).padStart(2, '0')}:00">${String(h).padStart(2, '0')}:00</option>`;
+    for (let h = 9; h <= 22; h++) endTimeSelect.innerHTML += `<option value="${String(h).padStart(2, '0')}:00">${String(h).padStart(2, '0')}:00</option>`;
+
+    function initTimetable() {
+      const timetableBody = document.getElementById('timetableBody');
+      timetableBody.innerHTML = '';
+      for (let h = 8; h < 22; h++) {
+        const timeLabel = `${String(h).padStart(2, '0')}:00 - ${String(h+1).padStart(2, '0')}:00`;
+        let rowHtml = `<tr><td class="time-col">${timeLabel}</td>`;
+        for (let day = 1; day <= 5; day++) {
+          rowHtml += `<td id="cell-${day}-${h}"></td>`;
+        }
+        rowHtml += `</tr>`;
+        timetableBody.innerHTML += rowHtml;
+      }
+    }
+
+    // 구글 시트로부터 서버 데이터 동기화
+    async function fetchBookings() {
+      if (!SCRIPT_URL || SCRIPT_URL.includes("여기에_구글")) {
+        alert("SCRIPT_URL을 설정해 주세요.");
+        return;
+      }
+      document.getElementById('loadingStatus').style.display = 'block';
+      try {
+        const res = await fetch(SCRIPT_URL);
+        bookings = await res.json();
+        renderTimetable();
+      } catch (err) {
+        console.error(err);
+        alert("예약 데이터를 불러오는 중 오류가 발생했습니다.");
+      } finally {
+        document.getElementById('loadingStatus').style.display = 'none';
+      }
+    }
+
+    function renderTimetable() {
+      initTimetable();
+      const selectedRoom = document.getElementById('viewRoomSelect').value;
+
+      bookings.forEach(b => {
+        if (b.room === selectedRoom) {
+          const bookingDate = new Date(b.date);
+          const day = bookingDate.getDay();
+
+          if (day >= 1 && day <= 5) {
+            const startH = parseInt(b.startTime.split(':')[0]);
+            const endH = parseInt(b.endTime.split(':')[0]);
+
+            for (let h = startH; h < endH; h++) {
+              const cell = document.getElementById(`cell-${day}-${h}`);
+              if (cell) {
+                cell.className = 'booked-cell';
+                cell.innerHTML = `<strong>${b.name}</strong><br>(${b.studentId})`;
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // 폼 제출
+    document.getElementById('bookingForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+
+      const name = document.getElementById('userName').value;
+      const studentId = document.getElementById('studentId').value;
+      const room = document.getElementById('roomSelect').value;
+      const dateStr = document.getElementById('bookingDate').value;
+      const startTime = document.getElementById('startTime').value;
+      const endTime = document.getElementById('endTime').value;
+
+      const dateVal = new Date(dateStr);
+      const day = dateVal.getDay();
+
+      if (day === 0 || day === 6) {
+        alert('예약은 월요일부터 금요일까지만 가능합니다.');
+        return;
+      }
+
+      const startH = parseInt(startTime.split(':')[0]);
+      const endH = parseInt(endTime.split(':')[0]);
+
+      if (startH >= endH) {
+        alert('종료 시간은 시작 시간보다 뒤여야 합니다.');
+        return;
+      }
+
+      if (endH - startH > 3) {
+        alert('1회 최대 예약 가능 시간은 3시간입니다.');
+        return;
+      }
+
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+      submitBtn.innerText = "예약 등록 중...";
+
+      const payload = { name, studentId, room, date: dateStr, startTime, endTime };
+
+      try {
+        const res = await fetch(SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+        const result = await res.json();
+
+        if (result.status === 'success') {
+          alert('예약이 정상적으로 구글 시트에 등록되었습니다!');
+          document.getElementById('viewRoomSelect').value = room;
+          await fetchBookings(); // 최신 DB 다시 조회
+          this.reset();
+        } else {
+          alert(result.message);
+        }
+      } catch (err) {
+        console.error(err);
+        alert('예약 등록 중 오류가 발생했습니다.');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.innerText = "예약 신청하기";
+      }
+    });
+
+    document.getElementById('viewRoomSelect').addEventListener('change', renderTimetable);
+
+    // 페이지 진입 시 데이터 로드
+    fetchBookings();
+  </script>
+</body>
+</html>
