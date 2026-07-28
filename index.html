@@ -1,10 +1,12 @@
+HTML
+
 
 <!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>세미나실 예약 시스템 (구글 연동)</title>
+  <title>세미나실 예약 시스템</title>
   <style>
     body { font-family: 'Noto Sans KR', sans-serif; max-width: 1000px; margin: 20px auto; padding: 0 15px; color: #333; }
     h2, h3 { color: #1a365d; text-align: center; }
@@ -97,12 +99,12 @@
   </div>
 
   <script>
-    // ⚠️ 2단계에서 생성한 Google Apps Script 웹 앱 URL을 아래에 넣으세요!
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx2yGuP6XPbT2Lh85cDfQ_P0l6sLiCg-GA-1xggYvgVAs3rvotkwiMwWBq-LE-FEgJp-g/exec";
+    // ⚠️ 방금 새로 배포하여 만든 Google Apps Script 웹 앱 URL을 넣으세요!
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxOMNTWSO0VIg7OzZwx9PGTzpm3BDbqQYPSrO7upJvEXuf04W4OlG7tuHOaMTgQF6rvlg/exec";
 
     let bookings = [];
 
-    // 시간 옵션 바인딩
+    // 시간 옵션 설정
     const startTimeSelect = document.getElementById('startTime');
     const endTimeSelect = document.getElementById('endTime');
     for (let h = 8; h <= 21; h++) startTimeSelect.innerHTML += `<option value="${String(h).padStart(2, '0')}:00">${String(h).padStart(2, '0')}:00</option>`;
@@ -122,23 +124,37 @@
       }
     }
 
-    // 구글 시트로부터 서버 데이터 동기화
-    async function fetchBookings() {
-      if (!SCRIPT_URL || SCRIPT_URL.includes("여기에_구글")) {
+    // JSONP 방식으로 CORS를 100% 무력화하고 구글 시트 데이터 로드
+    function fetchBookings() {
+      if (!SCRIPT_URL || SCRIPT_URL.includes("여기에_새로")) {
         alert("SCRIPT_URL을 설정해 주세요.");
         return;
       }
+
       document.getElementById('loadingStatus').style.display = 'block';
-      try {
-        const res = await fetch(SCRIPT_URL);
-        bookings = await res.json();
+
+      // 콜백 함수 정의
+      window.handleGoogleSheetData = function(data) {
+        bookings = data || [];
         renderTimetable();
-      } catch (err) {
-        console.error(err);
-        alert("예약 데이터를 불러오는 중 오류가 발생했습니다.");
-      } finally {
         document.getElementById('loadingStatus').style.display = 'none';
-      }
+        // 임시 스크립트 태그 제거
+        const oldScript = document.getElementById('jsonpScript');
+        if (oldScript) oldScript.remove();
+      };
+
+      // script 태그 동적 삽입 (CORS 영향을 받지 않음)
+      const oldScript = document.getElementById('jsonpScript');
+      if (oldScript) oldScript.remove();
+
+      const script = document.createElement('script');
+      script.id = 'jsonpScript';
+      script.src = SCRIPT_URL + '?callback=handleGoogleSheetData&t=' + new Date().getTime();
+      script.onerror = function() {
+        alert('구글 시트 데이터를 불러오는 데 실패했습니다.');
+        document.getElementById('loadingStatus').style.display = 'none';
+      };
+      document.body.appendChild(script);
     }
 
     function renderTimetable() {
@@ -166,7 +182,7 @@
       });
     }
 
-    // 폼 제출
+    // 폼 제출 (Form URL-Encoded 방식으로 CORS 방지)
     document.getElementById('bookingForm').addEventListener('submit', async function(e) {
       e.preventDefault();
 
@@ -202,23 +218,34 @@
       submitBtn.disabled = true;
       submitBtn.innerText = "예약 등록 중...";
 
-      const payload = { name, studentId, room, date: dateStr, startTime, endTime };
+      // CORS 헤더 문제 방지를 위한 URLSearchParams 사용
+      const params = new URLSearchParams();
+      params.append('name', name);
+      params.append('studentId', studentId);
+      params.append('room', room);
+      params.append('date', dateStr);
+      params.append('startTime', startTime);
+      params.append('endTime', endTime);
 
       try {
-        const res = await fetch(SCRIPT_URL, {
+        await fetch(SCRIPT_URL, {
           method: 'POST',
-          body: JSON.stringify(payload)
+          mode: 'no-cors', // CORS 차단을 완전히 우회함
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: params
         });
-        const result = await res.json();
 
-        if (result.status === 'success') {
-          alert('예약이 정상적으로 구글 시트에 등록되었습니다!');
-          document.getElementById('viewRoomSelect').value = room;
-          await fetchBookings(); // 최신 DB 다시 조회
+        alert('예약 신청이 전송되었습니다!');
+        document.getElementById('viewRoomSelect').value = room;
+        
+        // 제출 후 1.5초 뒤 데이터 동기화
+        setTimeout(() => {
+          fetchBookings();
           this.reset();
-        } else {
-          alert(result.message);
-        }
+        }, 1500);
+
       } catch (err) {
         console.error(err);
         alert('예약 등록 중 오류가 발생했습니다.');
@@ -230,7 +257,7 @@
 
     document.getElementById('viewRoomSelect').addEventListener('change', renderTimetable);
 
-    // 페이지 진입 시 데이터 로드
+    // 페이지 접속 시 데이터 로드
     fetchBookings();
   </script>
 </body>
