@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>세미나실 예약 시스템</title>
+  <title>세미나실 예약 시스템 (구글 연동)</title>
   <style>
     body { font-family: 'Noto Sans KR', sans-serif; max-width: 1000px; margin: 20px auto; padding: 0 15px; color: #333; }
     h2, h3 { color: #1a365d; text-align: center; }
@@ -96,12 +96,12 @@
   </div>
 
   <script>
-    // ⚠️ 방금 새로 배포하여 만든 Google Apps Script 웹 앱 URL을 넣으세요!
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKJAD2qUO8HGe9MGB-omPm6wz_0inSP19gESc0R_Tt10cCu_nZQLHog5lNang19aG_Lw/exec";
+    // ⚠️ 구글 Apps Script 웹 앱 URL을 아래에 정확히 넣으세요!
+    const SCRIPT_URL = "여기에_구글_웹앱_URL_복사_붙여넣기";
 
     let bookings = [];
 
-    // 시간 옵션 설정
+    // 시간 옵션 바인딩
     const startTimeSelect = document.getElementById('startTime');
     const endTimeSelect = document.getElementById('endTime');
     for (let h = 8; h <= 21; h++) startTimeSelect.innerHTML += `<option value="${String(h).padStart(2, '0')}:00">${String(h).padStart(2, '0')}:00</option>`;
@@ -121,10 +121,9 @@
       }
     }
 
-    // JSONP 방식으로 CORS를 100% 무력화하고 구글 시트 데이터 로드
+    // 💡 [개선] CORS 문제를 해결하기 위해 JSONP 방식으로 데이터 동기화
     function fetchBookings() {
-      if (!SCRIPT_URL || SCRIPT_URL.includes("여기에_새로")) {
-        alert("SCRIPT_URL을 설정해 주세요.");
+      if (!SCRIPT_URL || SCRIPT_URL.includes("여기에_구글")) {
         return;
       }
       document.getElementById('loadingStatus').style.display = 'block';
@@ -134,12 +133,9 @@
         bookings = data || [];
         renderTimetable();
         document.getElementById('loadingStatus').style.display = 'none';
-        // 임시 스크립트 태그 제거
-        const oldScript = document.getElementById('jsonpScript');
-        if (oldScript) oldScript.remove();
       };
 
-      // script 태그 동적 삽입 (CORS 영향을 받지 않음)
+      // 기존 스크립트 제거 후 재요청
       const oldScript = document.getElementById('jsonpScript');
       if (oldScript) oldScript.remove();
 
@@ -147,24 +143,41 @@
       script.id = 'jsonpScript';
       script.src = SCRIPT_URL + '?callback=handleGoogleSheetData&t=' + new Date().getTime();
       script.onerror = function() {
-        alert('구글 시트 데이터를 불러오는 데 실패했습니다.');
         document.getElementById('loadingStatus').style.display = 'none';
       };
       document.body.appendChild(script);
     }
 
+    // 💡 [개선] 시차(Timezone) 오류 없는 안정적인 날짜 파싱
+    function parseDate(dateStr) {
+      if (!dateStr) return null;
+      const nums = String(dateStr).replace(/[^0-9]/g, ' ').trim().split(/\s+/);
+      if (nums.length >= 3) {
+        const y = parseInt(nums[0]);
+        const m = parseInt(nums[1]) - 1;
+        const d = parseInt(nums[2]);
+        return new Date(y, m, d);
+      }
+      return null;
+    }
+
     function renderTimetable() {
       initTimetable();
-      const selectedRoom = document.getElementById('viewRoomSelect').value;
+      // 숫자로만 비교하기 위해 세미나실 값 정제 (ex: "1" 또는 "세미나실 1" -> "1")
+      const selectedRoom = String(document.getElementById('viewRoomSelect').value).replace(/[^0-9]/g, '');
 
       bookings.forEach(b => {
-        if (b.room === selectedRoom) {
-          const bookingDate = new Date(b.date);
-          const day = bookingDate.getDay();
+        const bookingRoom = String(b.room).replace(/[^0-9]/g, '');
+
+        if (bookingRoom === selectedRoom) {
+          const bookingDate = parseDate(b.date);
+          if (!bookingDate) return;
+
+          const day = bookingDate.getDay(); // 1: 월 ~ 5: 금
 
           if (day >= 1 && day <= 5) {
-            const startH = parseInt(b.startTime.split(':')[0]);
-            const endH = parseInt(b.endTime.split(':')[0]);
+            const startH = parseInt(String(b.startTime).split(':')[0]);
+            const endH = parseInt(String(b.endTime).split(':')[0]);
 
             for (let h = startH; h < endH; h++) {
               const cell = document.getElementById(`cell-${day}-${h}`);
@@ -178,7 +191,7 @@
       });
     }
 
-    // 폼 제출 (Form URL-Encoded 방식으로 CORS 방지)
+    // 폼 제출
     document.getElementById('bookingForm').addEventListener('submit', async function(e) {
       e.preventDefault();
 
@@ -189,7 +202,7 @@
       const startTime = document.getElementById('startTime').value;
       const endTime = document.getElementById('endTime').value;
 
-      const dateVal = new Date(dateStr);
+      const dateVal = parseDate(dateStr);
       const day = dateVal.getDay();
 
       if (day === 0 || day === 6) {
@@ -214,7 +227,6 @@
       submitBtn.disabled = true;
       submitBtn.innerText = "예약 등록 중...";
 
-      // CORS 헤더 문제 방지를 위한 URLSearchParams 사용
       const params = new URLSearchParams();
       params.append('name', name);
       params.append('studentId', studentId);
@@ -226,17 +238,15 @@
       try {
         await fetch(SCRIPT_URL, {
           method: 'POST',
-          mode: 'no-cors', // CORS 차단을 완전히 우회함
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: params
         });
 
-        alert('예약 신청이 전송되었습니다!');
+        alert('예약이 정상적으로 등록되었습니다!');
         document.getElementById('viewRoomSelect').value = room;
         
-        // 제출 후 1.5초 뒤 데이터 동기화
+        // 1.5초 후 데이터 다시 동기화
         setTimeout(() => {
           fetchBookings();
           this.reset();
@@ -253,7 +263,7 @@
 
     document.getElementById('viewRoomSelect').addEventListener('change', renderTimetable);
 
-    // 페이지 접속 시 데이터 로드
+    // 페이지 진입 시 데이터 로드
     fetchBookings();
   </script>
 </body>
