@@ -122,11 +122,11 @@
     }
 
     // JSONP 방식으로 CORS를 100% 무력화하고 구글 시트 데이터 로드
-    function fetchBookings() {
-      if (!SCRIPT_URL || SCRIPT_URL.includes("여기에_새로")) {
-        alert("SCRIPT_URL을 설정해 주세요.");
-        return;
-      }
+   // function fetchBookings() {
+   //   if (!SCRIPT_URL || SCRIPT_URL.includes("여기에_새로")) {
+    //    alert("SCRIPT_URL을 설정해 주세요.");
+    //    return;
+   //   }
 
       document.getElementById('loadingStatus').style.display = 'block';
 
@@ -239,7 +239,7 @@
         
         // 제출 후 1.5초 뒤 데이터 동기화
         setTimeout(() => {
-          fetchBookings();
+     //     fetchBookings();
           this.reset();
         }, 1500);
 
@@ -255,7 +255,7 @@
     document.getElementById('viewRoomSelect').addEventListener('change', renderTimetable);
 
     // 페이지 접속 시 데이터 로드
-    fetchBookings();
+//    fetchBookings();
   </script>
 </body>
 </html>
