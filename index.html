@@ -238,7 +238,7 @@
         
         // 제출 후 1.5초 뒤 데이터 동기화
         setTimeout(() => {
-     //     fetchBookings();
+          fetchBookings();
           this.reset();
         }, 1500);
 
@@ -254,7 +254,7 @@
     document.getElementById('viewRoomSelect').addEventListener('change', renderTimetable);
 
     // 페이지 접속 시 데이터 로드
-//    fetchBookings();
+    fetchBookings();
   </script>
 </body>
 </html>
