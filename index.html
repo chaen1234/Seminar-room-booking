@@ -210,6 +210,35 @@
         return;
       }
 
+      const isOverlapped = bookings.some(b => {
+  const bRoom = String(b.room).replace(/[^0-9]/g, '');
+  const targetRoom = String(room).replace(/[^0-9]/g, '');
+  
+  if (bRoom !== targetRoom) return false;
+
+  // 날짜 비교 (YYYY-MM-DD 포맷 통일)
+  const bDateObj = parseDate(b.date);
+  if (!bDateObj) return false;
+  
+  const bDateStr = `${bDateObj.getFullYear()}-${String(bDateObj.getMonth()+1).padStart(2,'0')}-${String(bDateObj.getDate()).padStart(2,'0')}`;
+  
+  if (bDateStr === dateStr) {
+    const existingStart = parseInt(String(b.startTime).split(':')[0]);
+    const existingEnd = parseInt(String(b.endTime).split(':')[0]);
+    
+    // 시간대 교차(Overlap) 조건: (신청시작 < 기존종료) && (신청종료 > 기존시작)
+    if (startH < existingEnd && endH > existingStart) {
+      return true;
+    }
+  }
+  return false;
+});
+
+if (isOverlapped) {
+  alert('❌ 해당 시간에는 이미 다른 예약이 존재합니다. 다른 시간을 선택해 주세요.');
+  return;
+}
+
       const submitBtn = document.getElementById('submitBtn');
       submitBtn.disabled = true;
       submitBtn.innerText = "예약 등록 중...";
