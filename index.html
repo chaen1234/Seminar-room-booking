@@ -144,6 +144,34 @@
       endTimeSelect.innerHTML += `<option value="${timeVal}">${timeVal}</option>`;
     }
 
+    function updateTableHeaders() {
+  const today = new Date();
+  const dayOfWeek = today.getDay(); // 0(일) ~ 6(토)
+  
+  // 오늘을 기준으로 이번 주 월요일 날짜 구하기
+  // 일요일(0)일 경우 지난주 월요일로 계산되는 것 방지
+  const distanceToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  
+  const monday = new Date(today);
+  monday.setDate(today.getDate() + distanceToMon);
+
+  const days = ['mon', 'tue', 'wed', 'thu', 'fri'];
+  const dayNames = ['월', '화', '수', '목', '금'];
+
+  days.forEach((day, index) => {
+    const targetDate = new Date(monday);
+    targetDate.setDate(monday.getDate() + index);
+
+    const month = targetDate.getMonth() + 1;
+    const date = targetDate.getDate();
+
+    const thElement = document.getElementById(`th-${day}`);
+    if (thElement) {
+      // 출력 형식: 월요일 (3/24)
+      thElement.innerText = `${dayNames[index]}요일 (${month}/${date})`;
+    }
+  });
+}
     // 💡 30분 단위 시간표 구조 생성
     function initTimetable() {
       const timetableBody = document.getElementById('timetableBody');
@@ -348,6 +376,7 @@
     document.getElementById('viewRoomSelect').addEventListener('change', renderTimetable);
 
     // 페이지 접속 시 데이터 로드
+    updateTableHeaders(); // 헤더 날짜 업데이트 실행
     fetchBookings();
   </script>
 </body>
