@@ -17,10 +17,10 @@
     .filter-container { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
     .timetable-wrapper { overflow-x: auto; border: 1px solid #cbd5e0; border-radius: 6px; }
     .timetable { width: 100%; border-collapse: collapse; min-width: 700px; text-align: center; background: white; }
-    .timetable th, .timetable td { border: 1px solid #e2e8f0; padding: 8px; font-size: 13px; }
+    .timetable th, .timetable td { border: 1px solid #e2e8f0; padding: 6px 4px; font-size: 12px; }
     .timetable th { background-color: #ebf8ff; color: #2b6cb0; }
-    .timetable td.time-col { background-color: #f7fafc; font-weight: bold; width: 90px; }
-    .booked-cell { background-color: #ebf8ff; border-left: 3px solid #3182ce !important; color: #2c5282; font-size: 12px; }
+    .timetable td.time-col { background-color: #f7fafc; font-weight: bold; width: 110px; }
+    .booked-cell { background-color: #ebf8ff; border-left: 3px solid #3182ce !important; color: #2c5282; font-size: 11px; }
     .loading-overlay { text-align: center; color: #4a5568; font-weight: bold; margin: 10px 0; }
   </style>
 </head>
@@ -43,15 +43,11 @@
           <label>세미나실 선택</label>
           <select id="roomSelect" required>
             <option value="">선택하세요</option>
-          //  <script>
-           //   for(let i=1; i<=10; i++) document.write(`<option value="${i}">세미나실 ${i}</option>`);
-          //  </script>
-
             <option value="X238">X238</option>
-        <option value="X236">X236</option>
-        <option value="X230">X230</option>
-        <option value="X330">X330</option>
-        <option value="X334">X334</option>
+            <option value="X236">X236</option>
+            <option value="X230">X230</option>
+            <option value="X330">X330</option>
+            <option value="X334">X334</option>
           </select>
         </div>
         <div class="form-group">
@@ -59,11 +55,11 @@
           <input type="date" id="bookingDate" required>
         </div>
         <div class="form-group">
-          <label>시작 시간 (08:00 ~ 21:00)</label>
+          <label>시작 시간 (08:00 ~ 21:30)</label>
           <select id="startTime" required></select>
         </div>
         <div class="form-group">
-          <label>종료 시간 (09:00 ~ 22:00)</label>
+          <label>종료 시간 (08:30 ~ 22:00)</label>
           <select id="endTime" required></select>
         </div>
       </div>
@@ -76,9 +72,6 @@
     <div>
       <label for="viewRoomSelect" style="font-weight: bold;">조회할 세미나실: </label>
       <select id="viewRoomSelect" style="padding: 5px 10px;">
-    //    <script>
-    //      for(let i=1; i<=10; i++) document.write(`<option value="${i}">세미나실 ${i}</option>`);
-     //   </script>
         <option value="X238">X238</option>
         <option value="X236">X236</option>
         <option value="X230">X230</option>
@@ -107,50 +100,104 @@
   </div>
 
   <script>
-    // ⚠️ 방금 새로 배포하여 만든 Google Apps Script 웹 앱 URL을 넣으세요!
     const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzKJAD2qUO8HGe9MGB-omPm6wz_0inSP19gESc0R_Tt10cCu_nZQLHog5lNang19aG_Lw/exec";
 
     let bookings = [];
 
-    // 시간 옵션 설정
+    // 시간을 분(Minutes) 단위 숫자로 변환하는 도우미 함수 (예: "08:30" -> 510)
+    function timeToMinutes(timeStr) {
+      if (!timeStr) return 0;
+      const parts = String(timeStr).split(':');
+      const h = parseInt(parts[0], 10) || 0;
+      const m = parseInt(parts[1], 10) || 0;
+      return h * 60 + m;
+    }
+
+    // 분(Minutes) 숫자를 "HH:MM" 형식 문자열로 변환하는 도우미 함수
+    function minutesToTime(minutes) {
+      const h = Math.floor(minutes / 60);
+      const m = minutes % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    }
+
+    // 💡 30분 단위 셀 ID 생성용 변환 함수 (08:00 -> "8-0", 08:30 -> "8-30")
+    function timeToCellKey(timeStr) {
+      const parts = String(timeStr).split(':');
+      const h = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      return `${h}-${m}`;
+    }
+
+    // 💡 30분 단위 Select 옵션 생성
     const startTimeSelect = document.getElementById('startTime');
     const endTimeSelect = document.getElementById('endTime');
-    for (let h = 8; h <= 21; h++) startTimeSelect.innerHTML += `<option value="${String(h).padStart(2, '0')}:00">${String(h).padStart(2, '0')}:00</option>`;
-    for (let h = 9; h <= 22; h++) endTimeSelect.innerHTML += `<option value="${String(h).padStart(2, '0')}:00">${String(h).padStart(2, '0')}:00</option>`;
 
+    // 시작 시간: 08:00 ~ 21:30
+    for (let m = 8 * 60; m <= 21 * 60 + 30; m += 30) {
+      const timeVal = minutesToTime(m);
+      startTimeSelect.innerHTML += `<option value="${timeVal}">${timeVal}</option>`;
+    }
+
+    // 종료 시간: 08:30 ~ 22:00
+    for (let m = 8 * 60 + 30; m <= 22 * 60; m += 30) {
+      const timeVal = minutesToTime(m);
+      endTimeSelect.innerHTML += `<option value="${timeVal}">${timeVal}</option>`;
+    }
+
+    // 💡 30분 단위 시간표 구조 생성
     function initTimetable() {
       const timetableBody = document.getElementById('timetableBody');
       timetableBody.innerHTML = '';
-      for (let h = 8; h < 22; h++) {
-        const timeLabel = `${String(h).padStart(2, '0')}:00 - ${String(h+1).padStart(2, '0')}:00`;
+
+      // 08:00부터 22:00까지 30분 스텝 반복
+      for (let m = 8 * 60; m < 22 * 60; m += 30) {
+        const startStr = minutesToTime(m);
+        const endStr = minutesToTime(m + 30);
+        const cellKey = timeToCellKey(startStr);
+        const timeLabel = `${startStr} - ${endStr}`;
+
         let rowHtml = `<tr><td class="time-col">${timeLabel}</td>`;
         for (let day = 1; day <= 5; day++) {
-          rowHtml += `<td id="cell-${day}-${h}"></td>`;
+          rowHtml += `<td id="cell-${day}-${cellKey}"></td>`;
         }
         rowHtml += `</tr>`;
         timetableBody.innerHTML += rowHtml;
       }
     }
 
-    // JSONP 방식으로 CORS를 100% 무력화하고 구글 시트 데이터 로드
-    function fetchBookings() {
-      if (!SCRIPT_URL || SCRIPT_URL.includes("여기에_새로")) {
-        alert("SCRIPT_URL을 설정해 주세요.");
-        return;
+    // 날짜 파싱 함수
+    function parseDate(dateStr) {
+      if (!dateStr) return null;
+      const nums = String(dateStr).replace(/[^0-9]/g, ' ').trim().split(/\s+/);
+      if (nums.length >= 3) {
+        const y = parseInt(nums[0], 10);
+        const m = parseInt(nums[1], 10) - 1;
+        const d = parseInt(nums[2], 10);
+        return new Date(y, m, d);
       }
+      return null;
+    }
+
+    // 세미나실 이름 정제 함수
+    function cleanRoomName(roomStr) {
+      return String(roomStr || '').replace(/\s+/g, '').toUpperCase();
+    }
+
+    // JSONP 방식으로 구글 시트 데이터 가져오기
+    function fetchBookings() {
+      if (!SCRIPT_URL) return;
+      
       document.getElementById('loadingStatus').style.display = 'block';
 
-      // 콜백 함수 정의
       window.handleGoogleSheetData = function(data) {
         bookings = data || [];
         renderTimetable();
         document.getElementById('loadingStatus').style.display = 'none';
-        // 임시 스크립트 태그 제거
+        
         const oldScript = document.getElementById('jsonpScript');
         if (oldScript) oldScript.remove();
       };
 
-      // script 태그 동적 삽입 (CORS 영향을 받지 않음)
       const oldScript = document.getElementById('jsonpScript');
       if (oldScript) oldScript.remove();
 
@@ -164,21 +211,28 @@
       document.body.appendChild(script);
     }
 
+    // 💡 30분 단위 시간표 렌더링
     function renderTimetable() {
       initTimetable();
-      const selectedRoom = document.getElementById('viewRoomSelect').value;
+      const selectedRoom = cleanRoomName(document.getElementById('viewRoomSelect').value);
 
       bookings.forEach(b => {
-        if (b.room === selectedRoom) {
-          const bookingDate = new Date(b.date);
+        const bookingRoom = cleanRoomName(b.room);
+
+        if (bookingRoom === selectedRoom) {
+          const bookingDate = parseDate(b.date);
+          if (!bookingDate) return;
+
           const day = bookingDate.getDay();
 
           if (day >= 1 && day <= 5) {
-            const startH = parseInt(b.startTime.split(':')[0]);
-            const endH = parseInt(b.endTime.split(':')[0]);
+            const startM = timeToMinutes(b.startTime);
+            const endM = timeToMinutes(b.endTime);
 
-            for (let h = startH; h < endH; h++) {
-              const cell = document.getElementById(`cell-${day}-${h}`);
+            // 30분 단위로 순회하면서 해당하는 셀을 찾아 채움
+            for (let m = startM; m < endM; m += 30) {
+              const cellKey = timeToCellKey(minutesToTime(m));
+              const cell = document.getElementById(`cell-${day}-${cellKey}`);
               if (cell) {
                 cell.className = 'booked-cell';
                 cell.innerHTML = `<strong>${b.name}</strong><br>(${b.studentId})`;
@@ -189,7 +243,7 @@
       });
     }
 
-    // 폼 제출 (Form URL-Encoded 방식으로 CORS 방지)
+    // 폼 제출 핸들러
     document.getElementById('bookingForm').addEventListener('submit', async function(e) {
       e.preventDefault();
 
@@ -200,7 +254,12 @@
       const startTime = document.getElementById('startTime').value;
       const endTime = document.getElementById('endTime').value;
 
-      const dateVal = new Date(dateStr);
+      const dateVal = parseDate(dateStr);
+      if (!dateVal) {
+        alert('올바른 날짜를 선택해 주세요.');
+        return;
+      }
+
       const day = dateVal.getDay();
 
       if (day === 0 || day === 6) {
@@ -208,16 +267,46 @@
         return;
       }
 
-      const startH = parseInt(startTime.split(':')[0]);
-      const endH = parseInt(endTime.split(':')[0]);
+      const startM = timeToMinutes(startTime);
+      const endM = timeToMinutes(endTime);
 
-      if (startH >= endH) {
+      if (startM >= endM) {
         alert('종료 시간은 시작 시간보다 뒤여야 합니다.');
         return;
       }
 
-      if (endH - startH > 3) {
+      // 최대 예약 가능 시간 검사 (3시간 = 180분)
+      if (endM - startM > 180) {
         alert('1회 최대 예약 가능 시간은 3시간입니다.');
+        return;
+      }
+
+      // 💡 30분 단위 중복 검증 (분 단위 비교)
+      const isOverlapped = bookings.some(b => {
+        const bRoom = cleanRoomName(b.room);
+        const targetRoom = cleanRoomName(room);
+        
+        if (bRoom !== targetRoom) return false;
+
+        const bDateObj = parseDate(b.date);
+        if (!bDateObj) return false;
+
+        const bDateStr = `${bDateObj.getFullYear()}-${String(bDateObj.getMonth()+1).padStart(2,'0')}-${String(bDateObj.getDate()).padStart(2,'0')}`;
+        
+        if (bDateStr === dateStr) {
+          const existingStartM = timeToMinutes(b.startTime);
+          const existingEndM = timeToMinutes(b.endTime);
+
+          // 시간 교차(Overlap) 조건 검사
+          if (startM < existingEndM && endM > existingStartM) {
+            return true;
+          }
+        }
+        return false;
+      });
+
+      if (isOverlapped) {
+        alert('❌ 해당 시간에는 이미 예약이 되어 있습니다. 다른 시간을 선택해 주세요.');
         return;
       }
 
@@ -225,29 +314,23 @@
       submitBtn.disabled = true;
       submitBtn.innerText = "예약 등록 중...";
 
-      // CORS 헤더 문제 방지를 위한 URLSearchParams 사용
-      const params = new URLSearchParams();
-      params.append('name', name);
-      params.append('studentId', studentId);
-      params.append('room', room);
-      params.append('date', dateStr);
-      params.append('startTime', startTime);
-      params.append('endTime', endTime);
+      const formData = new FormData();
+      formData.append('name', name);
+      formData.append('studentId', studentId);
+      formData.append('room', room);
+      formData.append('date', dateStr);
+      formData.append('startTime', startTime);
+      formData.append('endTime', endTime);
 
       try {
         await fetch(SCRIPT_URL, {
           method: 'POST',
-          mode: 'no-cors', // CORS 차단을 완전히 우회함
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          },
-          body: params
+          body: formData
         });
 
-        alert('예약 신청이 전송되었습니다!');
+        alert('예약이 정상적으로 구글 시트에 신청되었습니다!');
         document.getElementById('viewRoomSelect').value = room;
         
-        // 제출 후 1.5초 뒤 데이터 동기화
         setTimeout(() => {
           fetchBookings();
           this.reset();
