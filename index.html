@@ -22,6 +22,33 @@
     .timetable td.time-col { background-color: #f7fafc; font-weight: bold; width: 110px; }
     .booked-cell { background-color: #ebf8ff; border-left: 3px solid #3182ce !important; color: #2c5282; font-size: 11px; }
     .loading-overlay { text-align: center; color: #4a5568; font-weight: bold; margin: 10px 0; }
+    .notice-box {
+          background-color: #fff8e6; /* 연한 주황/노랑 배경 */
+          border-left: 4px solid #ffb100; /* 왼쪽에 눈에 띄는 포인트 선 */
+          padding: 12px 16px;
+          margin-top: 15px;
+          border-radius: 4px;
+        }
+        
+        .notice-box h4 {
+          margin: 0 0 6px 0;
+          font-size: 14px;
+          color: #b76e00;
+          display: flex;
+          align-items: center;
+        }
+        
+        .notice-box ul {
+          margin: 0;
+          padding-left: 20px;
+          font-size: 13px;
+          color: #555555;
+          line-height: 1.6;
+        }
+        
+        .notice-box li {
+          margin-bottom: 2px;
+        }
   </style>
 </head>
 <body>
@@ -73,6 +100,14 @@
       <button type="submit" class="btn-submit" id="submitBtn">예약 신청하기</button>
     </form>
   </div>
+
+  <div class="notice-box">
+  <h4>⚠️ 예약 시 주의사항</h4>
+  <ul>
+    <li>하루 최대 3시간까지만 사용 가능합니다.</li>
+    <li>예약은 매주 월요일 0시에 초기화됩니다.</li>
+  </ul>
+</div>
 
   <div class="filter-container">
     <h3>📅 주간 실시간 예약 시간표</h3>
