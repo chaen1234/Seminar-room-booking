@@ -50,10 +50,17 @@
             <option value="X334">X334</option>
           </select>
         </div>
-        <div class="form-group">
-          <label>예약 날짜 (월~금)</label>
-          <input type="date" id="bookingDate" required>
-        </div>
+      <div class="form-group">
+          <label>예약 요일 선택</label>
+          <select id="bookingDay" required>
+          <option value="">선택하세요</option>
+          <option value="1">월요일</option>
+          <option value="2">화요일</option>
+          <option value="3">수요일</option>
+          <option value="4">목요일</option>
+          <option value="5">금요일</option>
+        </select>
+    </div>
         <div class="form-group">
           <label>시작 시간 (08:00 ~ 21:30)</label>
           <select id="startTime" required></select>
@@ -278,7 +285,22 @@
       const name = document.getElementById('userName').value;
       const studentId = document.getElementById('studentId').value;
       const room = document.getElementById('roomSelect').value;
-      const dateStr = document.getElementById('bookingDate').value;
+      const dayValue = parseInt(document.getElementById('bookingDay').value, 10); // 1(월) ~ 5(금)
+        
+        // 선택한 요일에 해당하는 이번 주 실제 YYYY-MM-DD 날짜 구하기
+        const today = new Date();
+        const currentDay = today.getDay(); // 0(일) ~ 6(토)
+        const distanceToMon = currentDay === 0 ? -6 : 1 - currentDay;
+        
+        const targetDate = new Date(today);
+        targetDate.setDate(today.getDate() + distanceToMon + (dayValue - 1)); // 이번 주 해당 요일 날짜
+        
+        // YYYY-MM-DD 형식 문자열 생성
+        const year = targetDate.getFullYear();
+        const month = String(targetDate.getMonth() + 1).padStart(2, '0');
+        const date = String(targetDate.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${date}`;
+      
       const startTime = document.getElementById('startTime').value;
       const endTime = document.getElementById('endTime').value;
 
@@ -289,11 +311,6 @@
       }
 
       const day = dateVal.getDay();
-
-      if (day === 0 || day === 6) {
-        alert('예약은 월요일부터 금요일까지만 가능합니다.');
-        return;
-      }
 
       const startM = timeToMinutes(startTime);
       const endM = timeToMinutes(endTime);
@@ -356,7 +373,7 @@
           body: formData
         });
 
-        alert('예약이 정상적으로 구글 시트에 신청되었습니다!');
+        alert('예약이 정상적으로 신청되었습니다!');
         document.getElementById('viewRoomSelect').value = room;
         
         setTimeout(() => {
